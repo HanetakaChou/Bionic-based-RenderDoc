@@ -39,7 +39,7 @@ VkBool32 WrappedVulkan::vkGetPhysicalDeviceXcbPresentationSupportKHR(VkPhysicalD
 
 namespace Keyboard
 {
-void UseXcbConnection(xcb_connection_t *conn);
+  void UseXcbConnection(xcb_connection_t *conn);
 }
 
 VkResult WrappedVulkan::vkCreateXcbSurfaceKHR(VkInstance instance,
@@ -53,7 +53,7 @@ VkResult WrappedVulkan::vkCreateXcbSurfaceKHR(VkInstance instance,
   VkResult ret =
       ObjDisp(instance)->CreateXcbSurfaceKHR(Unwrap(instance), pCreateInfo, pAllocator, pSurface);
 
-  if(ret == VK_SUCCESS)
+  if (ret == VK_SUCCESS)
   {
     GetResourceManager()->WrapResource(Unwrap(instance), *pSurface);
 
@@ -76,7 +76,7 @@ VkResult WrappedVulkan::vkCreateXcbSurfaceKHR(VkInstance instance,
 
 namespace Keyboard
 {
-void UseWaylandDisplay(wl_display *disp);
+  void UseWaylandDisplay(wl_display *disp);
 }
 
 VkBool32 WrappedVulkan::vkGetPhysicalDeviceWaylandPresentationSupportKHR(
@@ -98,7 +98,7 @@ VkResult WrappedVulkan::vkCreateWaylandSurfaceKHR(VkInstance instance,
   VkResult ret = ObjDisp(instance)->CreateWaylandSurfaceKHR(Unwrap(instance), pCreateInfo,
                                                             pAllocator, pSurface);
 
-  if(ret == VK_SUCCESS)
+  if (ret == VK_SUCCESS)
   {
     GetResourceManager()->WrapResource(Unwrap(instance), *pSurface);
 
@@ -129,7 +129,7 @@ VkBool32 WrappedVulkan::vkGetPhysicalDeviceXlibPresentationSupportKHR(
 
 namespace Keyboard
 {
-void UseXlibDisplay(Display *dpy);
+  void UseXlibDisplay(Display *dpy);
 }
 
 VkResult WrappedVulkan::vkCreateXlibSurfaceKHR(VkInstance instance,
@@ -143,7 +143,7 @@ VkResult WrappedVulkan::vkCreateXlibSurfaceKHR(VkInstance instance,
   VkResult ret =
       ObjDisp(instance)->CreateXlibSurfaceKHR(Unwrap(instance), pCreateInfo, pAllocator, pSurface);
 
-  if(ret == VK_SUCCESS)
+  if (ret == VK_SUCCESS)
   {
     GetResourceManager()->WrapResource(Unwrap(instance), *pSurface);
 
@@ -180,7 +180,7 @@ VkResult WrappedVulkan::vkGetRandROutputDisplayEXT(VkPhysicalDevice physicalDevi
 void VulkanReplay::OutputWindow::SetWindowHandle(WindowingData window)
 {
 #if ENABLED(RDOC_XLIB)
-  if(window.system == WindowingSystem::Xlib)
+  if (window.system == WindowingSystem::Xlib)
   {
     xlib.display = window.xlib.display;
     xlib.window = window.xlib.window;
@@ -189,7 +189,7 @@ void VulkanReplay::OutputWindow::SetWindowHandle(WindowingData window)
 #endif
 
 #if ENABLED(RDOC_XCB)
-  if(window.system == WindowingSystem::XCB)
+  if (window.system == WindowingSystem::XCB)
   {
     xcb.connection = window.xcb.connection;
     xcb.window = window.xcb.window;
@@ -198,7 +198,7 @@ void VulkanReplay::OutputWindow::SetWindowHandle(WindowingData window)
 #endif
 
 #if ENABLED(RDOC_WAYLAND)
-  if(window.system == WindowingSystem::Wayland)
+  if (window.system == WindowingSystem::Wayland)
   {
     wayland.display = window.wayland.display;
     wayland.window = window.wayland.window;
@@ -212,7 +212,7 @@ void VulkanReplay::OutputWindow::SetWindowHandle(WindowingData window)
 void VulkanReplay::OutputWindow::CreateSurface(WrappedVulkan *driver, VkInstance inst)
 {
 #if ENABLED(RDOC_XLIB)
-  if(m_WindowSystem == WindowingSystem::Xlib)
+  if (m_WindowSystem == WindowingSystem::Xlib)
   {
     VkXlibSurfaceCreateInfoKHR createInfo;
 
@@ -230,7 +230,7 @@ void VulkanReplay::OutputWindow::CreateSurface(WrappedVulkan *driver, VkInstance
 #endif
 
 #if ENABLED(RDOC_XCB)
-  if(m_WindowSystem == WindowingSystem::XCB)
+  if (m_WindowSystem == WindowingSystem::XCB)
   {
     VkXcbSurfaceCreateInfoKHR createInfo;
 
@@ -248,7 +248,7 @@ void VulkanReplay::OutputWindow::CreateSurface(WrappedVulkan *driver, VkInstance
 #endif
 
 #if ENABLED(RDOC_WAYLAND)
-  if(m_WindowSystem == WindowingSystem::Wayland)
+  if (m_WindowSystem == WindowingSystem::Wayland)
   {
     VkWaylandSurfaceCreateInfoKHR createInfo;
 
@@ -270,12 +270,12 @@ void VulkanReplay::OutputWindow::CreateSurface(WrappedVulkan *driver, VkInstance
 
 void VulkanReplay::GetOutputWindowDimensions(uint64_t id, int32_t &w, int32_t &h)
 {
-  if(id == 0 || m_OutputWindows.find(id) == m_OutputWindows.end())
+  if (id == 0 || m_OutputWindows.find(id) == m_OutputWindows.end())
     return;
 
   OutputWindow &outw = m_OutputWindows[id];
 
-  if(outw.m_WindowSystem == WindowingSystem::Headless)
+  if (outw.m_WindowSystem == WindowingSystem::Headless)
   {
     w = outw.width;
     h = outw.height;
@@ -283,7 +283,7 @@ void VulkanReplay::GetOutputWindowDimensions(uint64_t id, int32_t &w, int32_t &h
   }
 
 #if ENABLED(RDOC_XLIB)
-  if(outw.m_WindowSystem == WindowingSystem::Xlib)
+  if (outw.m_WindowSystem == WindowingSystem::Xlib)
   {
     XWindowAttributes attr = {};
     XGetWindowAttributes(outw.xlib.display, outw.xlib.window, &attr);
@@ -296,10 +296,10 @@ void VulkanReplay::GetOutputWindowDimensions(uint64_t id, int32_t &w, int32_t &h
 #endif
 
 #if ENABLED(RDOC_XCB)
-  if(outw.m_WindowSystem == WindowingSystem::XCB)
+  if (outw.m_WindowSystem == WindowingSystem::XCB)
   {
     xcb_get_geometry_cookie_t geomCookie =
-        xcb_get_geometry(outw.xcb.connection, outw.xcb.window);    // window is a xcb_drawable_t
+        xcb_get_geometry(outw.xcb.connection, outw.xcb.window); // window is a xcb_drawable_t
     xcb_get_geometry_reply_t *geom = xcb_get_geometry_reply(outw.xcb.connection, geomCookie, NULL);
 
     w = (int32_t)geom->width;
@@ -312,7 +312,7 @@ void VulkanReplay::GetOutputWindowDimensions(uint64_t id, int32_t &w, int32_t &h
 #endif
 
 #if ENABLED(RDOC_WAYLAND)
-  if(outw.m_WindowSystem == WindowingSystem::Wayland)
+  if (outw.m_WindowSystem == WindowingSystem::Wayland)
   {
     RDCWARN("Need Wayland query for current surface dimensions");
     w = RDCMAX(1U, outw.width);

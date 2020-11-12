@@ -31,44 +31,44 @@ int utf8printv(char *buf, size_t bufsize, const char *fmt, va_list args);
 
 namespace StringFormat
 {
-rdcstr Fmt(const char *format, ...)
-{
-  va_list args;
-  va_start(args, format);
+  rdcstr Fmt(const char *format, ...)
+  {
+    va_list args;
+    va_start(args, format);
 
-  va_list args2;
-  va_copy(args2, args);
+    va_list args2;
+    va_copy(args2, args);
 
-  int size = ::utf8printv(NULL, 0, format, args2);
+    int size = ::utf8printv(NULL, 0, format, args2);
 
-  rdcstr ret;
-  ret.resize(size);
-  ::utf8printv(ret.data(), size + 1, format, args);
+    rdcstr ret;
+    ret.resize(size);
+    ::utf8printv(ret.data(), size + 1, format, args);
 
-  va_end(args);
-  va_end(args2);
+    va_end(args);
+    va_end(args2);
 
-  return ret;
-}
+    return ret;
+  }
 
-};    // namespace StringFormat
+}; // namespace StringFormat
 
 rdcstr Callstack::AddressDetails::formattedString(const char *commonPath)
 {
   const char *f = filename.c_str();
 
-  if(commonPath)
+  if (commonPath)
   {
     rdcstr common = strlower(rdcstr(commonPath));
     rdcstr fn = strlower(filename.substr(0, common.length()));
 
-    if(common == fn)
+    if (common == fn)
     {
       f += common.length();
     }
   }
 
-  if(line > 0)
+  if (line > 0)
     return StringFormat::Fmt("%s line %d", function.c_str(), line);
   else
     return function;
@@ -78,38 +78,55 @@ rdcstr OSUtility::MakeMachineIdentString(uint64_t ident)
 {
   rdcstr ret = "";
 
-  if(ident & MachineIdent_Windows)
+  if (ident & MachineIdent_Windows)
     ret += "Windows ";
-  else if(ident & MachineIdent_Linux)
+  else if (ident & MachineIdent_Linux)
     ret += "Linux ";
-  else if(ident & MachineIdent_macOS)
+  else if (ident & MachineIdent_macOS)
     ret += "macOS ";
-  else if(ident & MachineIdent_Android)
+  else if (ident & MachineIdent_Android)
     ret += "Android ";
-  else if(ident & MachineIdent_iOS)
+  else if (ident & MachineIdent_iOS)
     ret += "iOS ";
 
-  if(ident & MachineIdent_Arch_x86)
+  if (ident & MachineIdent_Arch_x86)
     ret += "x86 ";
-  else if(ident & MachineIdent_Arch_ARM)
+  else if (ident & MachineIdent_Arch_ARM)
     ret += "ARM ";
 
-  if(ident & MachineIdent_32bit)
+  if (ident & MachineIdent_32bit)
     ret += "32-bit ";
-  else if(ident & MachineIdent_64bit)
+  else if (ident & MachineIdent_64bit)
     ret += "64-bit ";
 
-  switch(ident & MachineIdent_GPU_Mask)
+  switch (ident & MachineIdent_GPU_Mask)
   {
-    case MachineIdent_GPU_ARM: ret += "ARM GPU "; break;
-    case MachineIdent_GPU_AMD: ret += "AMD GPU "; break;
-    case MachineIdent_GPU_IMG: ret += "Imagination GPU "; break;
-    case MachineIdent_GPU_Intel: ret += "Intel GPU "; break;
-    case MachineIdent_GPU_NV: ret += "nVidia GPU "; break;
-    case MachineIdent_GPU_QUALCOMM: ret += "QUALCOMM GPU "; break;
-    case MachineIdent_GPU_Samsung: ret += "Samsung GPU "; break;
-    case MachineIdent_GPU_Verisilicon: ret += "Verisilicon GPU "; break;
-    default: break;
+  case MachineIdent_GPU_ARM:
+    ret += "ARM GPU ";
+    break;
+  case MachineIdent_GPU_AMD:
+    ret += "AMD GPU ";
+    break;
+  case MachineIdent_GPU_IMG:
+    ret += "Imagination GPU ";
+    break;
+  case MachineIdent_GPU_Intel:
+    ret += "Intel GPU ";
+    break;
+  case MachineIdent_GPU_NV:
+    ret += "nVidia GPU ";
+    break;
+  case MachineIdent_GPU_QUALCOMM:
+    ret += "QUALCOMM GPU ";
+    break;
+  case MachineIdent_GPU_Samsung:
+    ret += "Samsung GPU ";
+    break;
+  case MachineIdent_GPU_Verisilicon:
+    ret += "Verisilicon GPU ";
+    break;
+  default:
+    break;
   }
 
   return ret;
@@ -131,10 +148,10 @@ TEST_CASE("Test OS-specific functions", "[osspecific]")
   {
     const char *var = Process::GetEnvVariable("TMP");
 
-    if(!var)
+    if (!var)
       var = Process::GetEnvVariable("TEMP");
 
-    if(!var)
+    if (!var)
       var = Process::GetEnvVariable("HOME");
 
     CHECK(var);
@@ -415,27 +432,27 @@ TEST_CASE("Test OS-specific functions", "[osspecific]")
 
     int values[totalCount] = {0};
 
-    for(int i = 0; i < totalCount; i++)
+    for (int i = 0; i < totalCount; i++)
       CHECK(values[i] == 0);
 
     // launch multiple threads, each setting a subset of the values. Ensure they don't trample or
     // write the wrong values
     Threading::ThreadHandle threads[numThreads];
-    for(int threadID = 0; threadID < numThreads; threadID++)
+    for (int threadID = 0; threadID < numThreads; threadID++)
     {
       threads[threadID] = Threading::CreateThread([&values, numValues, threadID]() {
-        for(int i = 0; i < numValues; i++)
+        for (int i = 0; i < numValues; i++)
           values[threadID * numValues + i] = threadID * 1000 + i;
       });
     }
 
-    for(int threadID = 0; threadID < numThreads; threadID++)
+    for (int threadID = 0; threadID < numThreads; threadID++)
     {
       Threading::JoinThread(threads[threadID]);
       Threading::CloseThread(threads[threadID]);
     }
 
-    for(int i = 0; i < totalCount; i++)
+    for (int i = 0; i < totalCount; i++)
     {
       CHECK((values[i] / 1000) == (i / numValues));
       CHECK((values[i] % 1000) == (i % numValues));
@@ -448,15 +465,15 @@ TEST_CASE("Test OS-specific functions", "[osspecific]")
 
     // check that thread atomics work on multiple overlapping threads
     Threading::ThreadHandle threads[numThreads];
-    for(int threadID = 0; threadID < numThreads; threadID++)
+    for (int threadID = 0; threadID < numThreads; threadID++)
     {
       threads[threadID] = Threading::CreateThread([&value, numValues]() {
-        for(int i = 0; i < numValues; i++)
+        for (int i = 0; i < numValues; i++)
           Atomic::Inc32(&value);
       });
     }
 
-    for(int threadID = 0; threadID < numThreads; threadID++)
+    for (int threadID = 0; threadID < numThreads; threadID++)
     {
       Threading::JoinThread(threads[threadID]);
       Threading::CloseThread(threads[threadID]);
@@ -502,7 +519,7 @@ TEST_CASE("Test OS-specific functions", "[osspecific]")
 
     CHECK(locked);
 
-    if(locked)
+    if (locked)
       lock.Unlock();
   };
 
@@ -562,4 +579,4 @@ TEST_CASE("Test OS-specific functions", "[osspecific]")
   };
 };
 
-#endif    // ENABLED(ENABLE_UNIT_TESTS)
+#endif // ENABLED(ENABLE_UNIT_TESTS)
