@@ -56,17 +56,18 @@ elseif(UNIX)
         PRIVATE -lrt)
 
     if(ENABLE_XLIB)
-        find_package(X11 REQUIRED)
+        pkg_check_modules(PC_X11 REQUIRED x11)
+        set(X11_INCLUDE_DIRS)
+        set(X11_LIBRARIES X11)
 
         list(APPEND RDOC_INCLUDES
-            PRIVATE ${X11_X11_INCLUDE_PATH})
+            PRIVATE ${X11_INCLUDE_DIRS})
 
         list(APPEND RDOC_LIBRARIES
-            PRIVATE ${X11_X11_LIB})
+            PRIVATE -l${X11_LIBRARIES})
     endif()
 
     if(ENABLE_XCB)
-        # This should be fixed and moved to FindXCB.cmake
         pkg_check_modules(PC_XCB REQUIRED xcb xcb-keysyms)
         set(XCB_INCLUDE_DIRS)
         set(XCB_LIBRARIES xcb xcb-keysyms)
@@ -317,12 +318,14 @@ elseif(UNIX)
         data/embedded_files.h
         os/posix/linux/linux_stringio.cpp
         os/posix/linux/linux_callstack.cpp
+        3rdparty/plthook/plthook.h
+        3rdparty/plthook/plthook_elf.c
+        os/posix/linux/libc_malloc_debug_backtrace/backtrace.cpp
+        os/posix/linux/libc_malloc_debug_backtrace/MapData.cpp
         os/posix/linux/linux_process.cpp
         os/posix/linux/linux_threading.cpp
         os/posix/linux/linux_hook.cpp
         os/posix/linux/linux_network.cpp
-        3rdparty/plthook/plthook.h
-        3rdparty/plthook/plthook_elf.c
         os/posix/posix_network.h
         os/posix/posix_network.cpp
         os/posix/posix_process.cpp
@@ -403,21 +406,12 @@ set(data
 
 set(data_objects)
 
-if(UNIX)
-    # If we're cross-compiling, include-bin will get built for the target and we
-    # then can't execute it. Instead, we force calling c++ (which we can safely
-    # assume is present) directly to build the binary
+if(UNIX)  
+    set(INCLUDE_BIN_PATH "" CACHE STRING "include-bin path for cross-compiling.")
 
-    if(CMAKE_CROSSCOMPILING)
-        set(HOST_NATIVE_CPP_COMPILER c++ CACHE STRING "Command to run to compile a .cpp into an executable. Default is just c++")
-
-        add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/include-bin
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-            COMMAND ${HOST_NATIVE_CPP_COMPILER} 3rdparty/include-bin/main.cpp -o ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/include-bin
-            DEPENDS 3rdparty/include-bin/main.cpp)
-        set(INCLUDE_BIN_EXE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/include-bin")
-        set(INCLUDE_BIN_DEP "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/include-bin")
+    if(NOT INCLUDE_BIN_PATH STREQUAL "")
+        set(INCLUDE_BIN_EXE "${INCLUDE_BIN_PATH}")
+        set(INCLUDE_BIN_DEP "${INCLUDE_BIN_PATH}")
     else()
         add_executable(include-bin 3rdparty/include-bin/main.cpp)
         set(INCLUDE_BIN_EXE $<TARGET_FILE:include-bin>)

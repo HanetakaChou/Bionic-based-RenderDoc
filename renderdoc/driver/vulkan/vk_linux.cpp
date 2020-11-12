@@ -325,7 +325,16 @@ void VulkanReplay::GetOutputWindowDimensions(uint64_t id, int32_t &w, int32_t &h
   RDCERR("Unrecognised/unsupported window system %d", outw.m_WindowSystem);
 }
 
+#include <sys/cdefs.h>
+
+#ifdef __BIONIC__
+void *LoadVulkanLibrary()
+{
+  return Process::LoadModule("libvulkan.so");
+}
+#else
 void *LoadVulkanLibrary()
 {
   return Process::LoadModule("libvulkan.so.1");
 }
+#endif

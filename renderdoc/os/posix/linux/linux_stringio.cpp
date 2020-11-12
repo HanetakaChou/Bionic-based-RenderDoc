@@ -25,7 +25,6 @@
 #include <ctype.h>
 #include <dlfcn.h>
 #include <errno.h>
-#include <iconv.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <string.h>
@@ -34,6 +33,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <set>
+#include <byteswap.h>
 #include "api/app/renderdoc_app.h"
 #include "api/replay/replay_enums.h"
 #include "common/common.h"
@@ -920,27 +920,12 @@ namespace FileIO
 
 namespace StringFormat
 {
-  // cache iconv_t descriptor to save on iconv_open/iconv_close each time
-  iconv_t iconvWide2UTF8 = (iconv_t)-1;
-  iconv_t iconvUTF82Wide = (iconv_t)-1;
 
-  // iconv is not thread safe when sharing an iconv_t descriptor
-  // I don't expect much contention but if it happens we could TryLock
-  // before creating a temporary iconv_t, or hold two iconv_ts, or something.
-  Threading::CriticalSection iconvLock;
+  void Shutdown() {}
 
-  void Shutdown()
-  {
-    SCOPED_LOCK(iconvLock);
+  bool iConv_UTF16ToUTF8(uint16_t const *pInBuf, size_t *pInCharsLeft, uint8_t *pOutBuf, size_t *pOutCharsLeft);
 
-    if (iconvWide2UTF8 != (iconv_t)-1)
-      iconv_close(iconvWide2UTF8);
-    iconvWide2UTF8 = (iconv_t)-1;
-
-    if (iconvUTF82Wide != (iconv_t)-1)
-      iconv_close(iconvUTF82Wide);
-    iconvUTF82Wide = (iconv_t)-1;
-  }
+  bool iConv_UTF8ToUTF16(uint8_t const *pInBuf, size_t *pInCharsLeft, uint16_t *pOutBuf, size_t *pOutCharsLeft);
 
   rdcstr Wide2UTF8(const rdcwstr &s)
   {
@@ -950,29 +935,33 @@ namespace StringFormat
 
     rdcarray<char> charBuffer(len);
 
-    size_t ret;
-
+    uint16_t const *inbuf;
+    // Handle BOM
     {
-      SCOPED_LOCK(iconvLock);
-
-      if (iconvWide2UTF8 == (iconv_t)-1)
-        iconvWide2UTF8 = iconv_open("UTF-8", "WCHAR_T");
-
-      if (iconvWide2UTF8 == (iconv_t)-1)
+      uint16_t *inbuf_bom = const_cast<uint16_t *>(reinterpret_cast<uint16_t const *>(s.c_str()));
+      if (inbuf_bom[0] == 0XFEFF)
       {
-        RDCERR("Couldn't open iconv for WCHAR_T to UTF-8: %d", errno);
-        return "";
+        inbuf = inbuf_bom + 1;
       }
-
-      char *inbuf = (char *)s.c_str();
-      size_t insize = (s.length() + 1) * sizeof(wchar_t); // include null terminator
-      char *outbuf = &charBuffer[0];
-      size_t outsize = len;
-
-      ret = iconv(iconvWide2UTF8, &inbuf, &insize, &outbuf, &outsize);
+      else if (inbuf_bom[0] == 0XFFFE)
+      {
+        for (size_t i = 1; i <= s.length(); ++i)
+        {
+          inbuf_bom[i] = (bswap_16(inbuf_bom[i]));
+        }
+        inbuf = inbuf_bom + 1;
+      }
+      else
+      {
+        inbuf = inbuf_bom;
+      }
     }
+    size_t insize = s.length() + 1; // include null terminator
+    uint8_t *outbuf = reinterpret_cast<uint8_t *>(&charBuffer[0]);
+    size_t outsize = len;
 
-    if (ret == (size_t)-1)
+    bool ret = iConv_UTF16ToUTF8(inbuf, &insize, outbuf, &outsize);
+    if (!ret)
     {
 #if ENABLED(RDOC_DEVEL)
       RDCWARN("Failed to convert wstring");
@@ -988,35 +977,31 @@ namespace StringFormat
 
   rdcwstr UTF82Wide(const rdcstr &s)
   {
-    // include room for null terminator, for ascii input we need at least as many output chars as
-    // input.
+    // include room for null terminator, for ascii input we need at least as many
+    // output chars as input.
     size_t len = s.length() + 1;
 
     rdcarray<wchar_t> wcharBuffer(len);
 
-    size_t ret;
-
+    uint8_t const *inbuf;
+    // Handle BOM
     {
-      SCOPED_LOCK(iconvLock);
-
-      if (iconvUTF82Wide == (iconv_t)-1)
-        iconvUTF82Wide = iconv_open("WCHAR_T", "UTF-8");
-
-      if (iconvUTF82Wide == (iconv_t)-1)
+      uint8_t const *inbuf_bom = reinterpret_cast<uint8_t const *>(s.c_str());
+      if (inbuf_bom[0] == 0xEF && inbuf_bom[1] == 0xBB && inbuf_bom[2] == 0xBF)
       {
-        RDCERR("Couldn't open iconv for UTF-8 to WCHAR_T: %d", errno);
-        return L"";
+        inbuf = inbuf_bom + 3;
       }
-
-      char *inbuf = (char *)s.c_str();
-      size_t insize = s.length() + 1; // include null terminator
-      char *outbuf = (char *)&wcharBuffer[0];
-      size_t outsize = len * sizeof(wchar_t);
-
-      ret = iconv(iconvUTF82Wide, &inbuf, &insize, &outbuf, &outsize);
+      else
+      {
+        inbuf = inbuf_bom;
+      }
     }
+    size_t insize = s.length() + 1; // include null terminator
+    uint16_t *outbuf = reinterpret_cast<uint16_t *>(&wcharBuffer[0]);
+    size_t outsize = len;
 
-    if (ret == (size_t)-1)
+    bool ret = iConv_UTF8ToUTF16(inbuf, &insize, outbuf, &outsize);
+    if (!ret)
     {
 #if ENABLED(RDOC_DEVEL)
       RDCWARN("Failed to convert wstring");
@@ -1027,6 +1012,315 @@ namespace StringFormat
     // convert to string from null-terminated string
     return rdcwstr(&wcharBuffer[0]);
   }
+
+  bool iConv_UTF16ToUTF8(uint16_t const *pInBuf, size_t *pInCharsLeft, uint8_t *pOutBuf, size_t *pOutCharsLeft)
+  {
+    while ((*pInCharsLeft) >= 1)
+    {
+      uint32_t ucs4code = 0; //Accumulator
+
+      //UTF-16 To UCS-4
+      if ((*pInBuf) >= 0XD800U && (*pInBuf) <= 0XDBFFU) //110110xxxxxxxxxx
+      {
+        if ((*pInCharsLeft) >= 2)
+        {
+          ucs4code += (((*pInBuf) - 0XD800U) << 10U); //Accumulate
+
+          ++pInBuf;
+          --(*pInCharsLeft);
+
+          if ((*pInBuf) >= 0XDC00U && (*pInBuf) <= 0XDFFF) //110111xxxxxxxxxx
+          {
+            ucs4code += ((*pInBuf) - 0XDC00U); //Accumulate
+
+            ++pInBuf;
+            --(*pInCharsLeft);
+          }
+          else
+          {
+            return false;
+          }
+
+          ucs4code += 0X10000U;
+        }
+        else
+        {
+          return false;
+        }
+      }
+      else
+      {
+        ucs4code += (*pInBuf); //Accumulate
+
+        ++pInBuf;
+        --(*pInCharsLeft);
+      }
+
+      //UCS-4 To UTF-16
+      if (ucs4code < 128U) //0XXX XXXX
+      {
+        if ((*pOutCharsLeft) >= 1)
+        {
+          (*pOutBuf) = static_cast<uint8_t>(ucs4code);
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+        }
+        else
+        {
+          return false;
+        }
+      }
+      else if (ucs4code < 2048U) //110X XXXX 10XX XXXX
+      {
+        if ((*pOutCharsLeft) >= 2)
+        {
+          (*pOutBuf) = static_cast<uint8_t>(((ucs4code & 0X7C0U) >> 6U) + 192U);
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+
+          (*pOutBuf) = static_cast<uint8_t>((ucs4code & 0X3FU) + 128U);
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+        }
+        else
+        {
+          return false;
+        }
+      }
+      else if (ucs4code < 0X10000U) //1110 XXXX 10XX XXXX 10XX XXXX
+      {
+        if ((*pOutCharsLeft) >= 3)
+        {
+          (*pOutBuf) = static_cast<uint8_t>(((ucs4code & 0XF000U) >> 12U) + 224U);
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+
+          (*pOutBuf) = static_cast<uint8_t>(((ucs4code & 0XFC0U) >> 6U) + 128U);
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+
+          (*pOutBuf) = static_cast<uint8_t>((ucs4code & 0X3FU) + 128U);
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+        }
+        else
+        {
+          return false;
+        }
+      }
+      else if (ucs4code < 0X200000U) //1111 0XXX 10XX XXXX 10XX XXXX 10XX XXXX
+      {
+        if ((*pOutCharsLeft) >= 4)
+        {
+          (*pOutBuf) = static_cast<uint8_t>(((ucs4code & 0X1C0000U) >> 18U) + 240U);
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+
+          (*pOutBuf) = static_cast<uint8_t>(((ucs4code & 0X3F000U) >> 12U) + 128U);
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+
+          (*pOutBuf) = static_cast<uint8_t>(((ucs4code & 0XFC0U) >> 6U) + 128U);
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+
+          (*pOutBuf) = static_cast<uint8_t>((ucs4code & 0X3FU) + 128U);
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+        }
+        else //ucs4code >= 0X200000U
+        {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  bool iConv_UTF8ToUTF16(uint8_t const *pInBuf, size_t *pInCharsLeft, uint16_t *pOutBuf, size_t *pOutCharsLeft)
+  {
+    while ((*pInCharsLeft) >= 1)
+    {
+      uint32_t ucs4code = 0; //Accumulator
+
+      //UTF-8 To UCS-4
+      if ((*pInBuf) < 128U) //0XXX XXXX
+      {
+        ucs4code += (*pInBuf); //Accumulate
+
+        ++pInBuf;
+        --(*pInCharsLeft);
+      }
+      else if ((*pInBuf) < 192U) //10XX XXXX
+      {
+        return false;
+      }
+      else if ((*pInBuf) < 224U) //110X XXXX 10XX XXXX
+      {
+
+        if ((*pInCharsLeft) >= 2)
+        {
+          ucs4code += (((*pInBuf) - 192U) << 6U); //Accumulate
+
+          ++pInBuf;
+          --(*pInCharsLeft);
+
+          if ((*pInBuf) >= 128U && (*pInBuf) < 192U) //10XX XXXX
+          {
+            ucs4code += ((*pInBuf) - 128U); //Accumulate
+
+            ++pInBuf;
+            --(*pInCharsLeft);
+          }
+          else
+          {
+            return false;
+          }
+        }
+        else
+        {
+          return false;
+        }
+      }
+      else if ((*pInBuf) < 240U) //1110 XXXX 10XX XXXX 10XX XXXX
+      {
+        if ((*pInCharsLeft) >= 3)
+        {
+          ucs4code += (((*pInBuf) - 224U) << 12U); //Accumulate
+
+          ++pInBuf;
+          --(*pInCharsLeft);
+
+          if ((*pInBuf) >= 128U && (*pInBuf) < 192U) //10XX XXXX
+          {
+            ucs4code += (((*pInBuf) - 128U) << 6U); //Accumulate
+
+            ++pInBuf;
+            --(*pInCharsLeft);
+          }
+          else
+          {
+            return false;
+          }
+
+          if ((*pInBuf) >= 128U && (*pInBuf) < 192U) //10XX XXXX
+          {
+            ucs4code += ((*pInBuf) - 128U); //Accumulate
+
+            ++pInBuf;
+            --(*pInCharsLeft);
+          }
+          else
+          {
+            return false;
+          }
+        }
+        else
+        {
+          return false;
+        }
+      }
+      else // ((*pInBuf) >= 240U) 1111 0XXX 10XX XXXX 10XX XXXX 10XX XXXX
+      {
+        if ((*pInCharsLeft) >= 4)
+        {
+          ucs4code += (((*pInBuf) - 240U) << 18U); //Accumulate
+
+          ++pInBuf;
+          --(*pInCharsLeft);
+
+          if ((*pInBuf) >= 128U && (*pInBuf) < 192U) //10XX XXXX
+          {
+            ucs4code += (((*pInBuf) - 128U) << 12U); //Accumulate
+
+            ++pInBuf;
+            --(*pInCharsLeft);
+          }
+          else
+          {
+            return false;
+          }
+
+          if ((*pInBuf) >= 128U && (*pInBuf) < 192U) //10XX XXXX
+          {
+            ucs4code += (((*pInBuf) - 128U) << 6U); //Accumulate
+
+            ++pInBuf;
+            --(*pInCharsLeft);
+          }
+          else
+          {
+            return false;
+          }
+
+          if ((*pInBuf) >= 128U && (*pInBuf) < 192U) //10XX XXXX
+          {
+            ucs4code += ((*pInBuf) - 128U); //Accumulate
+
+            ++pInBuf;
+            --(*pInCharsLeft);
+          }
+          else
+          {
+            return false;
+          }
+        }
+        else
+        {
+          return false;
+        }
+      }
+
+      //UCS-4 To UTF-16
+      if (ucs4code < 0X10000U)
+      {
+        if ((*pOutCharsLeft) >= 1)
+        {
+          (*pOutBuf) = static_cast<uint16_t>(ucs4code);
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+        }
+        else
+        {
+          return false;
+        }
+      }
+      else //ucs4code >= 0X10000U
+      {
+        if ((*pOutCharsLeft) >= 2)
+        {
+          (*pOutBuf) = static_cast<uint16_t>((((ucs4code - 65536U) & (0XFFC00U)) >> 10U) + 0XD800U); //110110xxxxxxxxxx
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+
+          (*pOutBuf) = static_cast<uint16_t>(((ucs4code - 65536U) & (0X3FFU)) + 0XDC00U); //110111xxxxxxxxxx
+
+          ++pOutBuf;
+          --(*pOutCharsLeft);
+        }
+        else
+        {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
 }; // namespace StringFormat
 
 namespace OSUtility

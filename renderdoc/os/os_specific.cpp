@@ -68,10 +68,14 @@ rdcstr Callstack::AddressDetails::formattedString(const char *commonPath)
     }
   }
 
-  if (line > 0)
-    return StringFormat::Fmt("%s line %d", function.c_str(), line);
+  if (line != uint32_t(-1))
+  {
+    return StringFormat::Fmt("%s          %s:%d", function.c_str(), filename.c_str(), line);
+  }
   else
-    return function;
+  {
+    return StringFormat::Fmt("%s          %s", function.c_str(), filename.c_str());
+  }
 }
 
 rdcstr OSUtility::MakeMachineIdentString(uint64_t ident)

@@ -244,6 +244,14 @@ file(GLOB QRD_INTERFACE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Code/Interface/*.h)
 list(SORT RDOC_REPLAY_FILES)
 list(SORT QRD_INTERFACE_FILES)
 
+if(NOT INCLUDE_BIN_PATH STREQUAL "")
+    set(INCLUDE_BIN_EXE "${INCLUDE_BIN_PATH}")
+    set(INCLUDE_BIN_DEP "${INCLUDE_BIN_PATH}")
+else()
+    set(INCLUDE_BIN_EXE "{CMAKE_RUNTIME_OUTPUT_DIRECTORY}/include-bin")
+    set(INCLUDE_BIN_DEP "{CMAKE_RUNTIME_OUTPUT_DIRECTORY}/include-bin")
+endif()
+
 foreach(in ${swig_interfaces})
     get_filename_component(swig_file ${in} NAME_WE)
 
@@ -256,10 +264,10 @@ foreach(in ${swig_interfaces})
 
     add_custom_command(OUTPUT ${swig_file}.py.c
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-            COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/include-bin ${swig_file}.py ${swig_file}.py.c
-            DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/include-bin
+            COMMAND ${INCLUDE_BIN_EXE} ${swig_file}.py ${swig_file}.py.c
+            DEPENDS ${INCLUDE_BIN_DEP}
             DEPENDS ${swig_file}_python.cxx)
-
+    
     list(APPEND swig_output ${swig_file}_python.cxx)
     list(APPEND swig_output ${swig_file}.py.c)
 endforeach()

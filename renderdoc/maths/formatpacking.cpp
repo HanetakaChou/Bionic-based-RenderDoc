@@ -25,6 +25,7 @@
 #include "formatpacking.h"
 #include <float.h>
 #include <math.h>
+#include <cmath>
 #include "api/replay/data_types.h"
 #include "api/replay/rdcpair.h"
 #include "common/common.h"
@@ -410,7 +411,7 @@ TEST_CASE("Check format conversion", "[format]")
 
       INFO(a);
       INFO(c);
-      CHECK(abs(a - c) <= abs(a * 3.0f * FLT_EPSILON));
+      CHECK(fabsf(a - c) <= fabsf(a * 3.0f * FLT_EPSILON));
 
       if(i == UINT16_MAX)
         break;

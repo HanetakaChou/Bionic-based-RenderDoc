@@ -217,6 +217,6 @@ enum
 #else
 
 // otherwise, enable them in development builds
-#define ENABLE_UNIT_TESTS RDOC_DEVEL
+#define ENABLE_UNIT_TESTS OPTION_OFF
 
 #endif
